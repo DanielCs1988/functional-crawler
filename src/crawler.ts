@@ -1,8 +1,11 @@
 import { launch } from 'puppeteer'
 import * as TE from 'fp-ts/lib/TaskEither'
+import * as RA from 'fp-ts/lib/ReadonlyArray'
+import * as N from 'fp-ts/Number'
 import { pipe } from 'fp-ts/lib/function'
 
 import {NewsEntry, ProcessedNews} from "./types";
+import {contramap} from "fp-ts/Ord";
 
 async function run(): Promise<void> {
   const url = 'https://news.ycombinator.com/'
@@ -22,7 +25,7 @@ async function run(): Promise<void> {
     TE.chain(
       browser => TE.tryCatch(
         async () => {
-          const results = await pipe(
+          await pipe(
             TE.tryCatch(
               () => browser.newPage(),
               reason => new Error(`Could not open new page. Reason: ${reason}`),
@@ -44,8 +47,10 @@ async function run(): Promise<void> {
               ),
             ),
             TE.map(calculateResults),
-          )
-          console.log(results)
+            TE.map(results => {
+              console.log(results)
+            }),
+          )()
 
           return browser
         },
@@ -58,7 +63,9 @@ async function run(): Promise<void> {
         reason => new Error(`Could not close browser. Reason: ${reason}`),
       ),
     ),
-  )
+  )()
+
+  console.log(`[${new Date().toISOString()}] Crawler finished.`)
 }
 
 function crawlPage(): NewsEntry[] {
@@ -85,18 +92,32 @@ function crawlPage(): NewsEntry[] {
   })
 }
 
-function calculateResults(data: NewsEntry[]): ProcessedNews {
-  const longTitles = data
-    .filter(result => {
+function calculateResults(data: ReadonlyArray<NewsEntry>): ProcessedNews {
+  const longTitles = pipe(
+    data,
+    RA.filter(result => {
       return result.title.split(/\s+/).length > 5
-    })
-    .sort((a, b) => a.comments - b.comments)
+    }),
+    RA.sort(
+      pipe(
+        N.Ord,
+        contramap((result: NewsEntry) => result.comments),
+      )
+    )
+  )
 
-  const shortTitles = data
-    .filter(result => {
+  const shortTitles = pipe(
+    data,
+    RA.filter(result => {
       return result.title.split(/\s+/).length <= 5
-    })
-    .sort((a, b) => a.score - b.score)
+    }),
+    RA.sort(
+      pipe(
+        N.Ord,
+        contramap((result: NewsEntry) => result.score),
+      )
+    )
+  )
 
   return {
     longTitles,

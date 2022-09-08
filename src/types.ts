@@ -6,6 +6,6 @@ export interface NewsEntry {
 }
 
 export interface ProcessedNews {
-  readonly longTitles: NewsEntry[]
-  readonly shortTitles: NewsEntry[]
+  readonly longTitles: ReadonlyArray<NewsEntry>
+  readonly shortTitles: ReadonlyArray<NewsEntry>
 }
